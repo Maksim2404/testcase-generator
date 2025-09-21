@@ -1,0 +1,33 @@
+﻿stages:
+  - build
+  - deploy
+
+validate:
+  stage: build
+  image: python:3.11
+  tags: [qa]
+  script:
+    - pip install pyyaml jinja2 openpyxl
+    - python scripts/build_traceability.py
+  artifacts:
+    when: always
+    paths:
+      - traceability/traceability.csv
+      - traceability/traceability.xlsx
+      - traceability/index.html
+      - traceability/stats.json
+      - traceability/stats.html
+      - traceability/warnings.txt
+
+pages:
+  stage: deploy
+  needs: [validate]
+  tags: [qa]
+  script:
+    - mkdir -p public
+    - mv traceability/* public/
+  artifacts:
+    paths:
+      - public
+  only:
+    - main
