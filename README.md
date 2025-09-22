@@ -34,6 +34,7 @@ Practical value
 
 <img width="3626" height="1135" alt="screenshot" src="https://github.com/user-attachments/assets/4bdfb694-1626-4893-96c8-aefb24466219" />
 
+Note: UI is intentionally simple — functional prototype to prove the workflow.
 
 👉 The UI is intentionally simple — it’s not meant to be pretty, but to start helping right away.
 You can run it locally or via Docker and see how test cases are generated and sent to GitLab.
