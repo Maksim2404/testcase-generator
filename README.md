@@ -1,61 +1,102 @@
-# Test Case Generator (Python + React)
+📋 Test Case Generator
 
-Generate structured QA test cases from short feature notes. Supports AI (OpenAI) or a lightweight stub for demos. 
-Optionally produces a GitLab Merge Request draft.
+Generate structured QA test cases from scratch — even when there’s no documentation.
+Built to help teams bootstrap quality processes quickly, without wasting hours writing boilerplate.
 
-## Features
-- 🧠 AI-assisted or stubbed generation
-- 🧩 YAML front-matter + Markdown body
-- 🐙 Optional GitLab MR draft output
-- 🐳 One-line Docker compose
+🚀 What this app does (and why it matters)
+Core features
 
-## Quickstart (Docker)
-```bash
-cp .env.example .env   
-docker compose up --build
-# Open http://localhost:8000
+AI/stub generation → structured Markdown test cases (front-matter + sections).
 
-## Quickstart (Dev)
+Auto-ID allocation (APP-TC-###) → prevents duplicates, keeps naming consistent.
 
-### Backend
+Linting → enforces required YAML keys (owner, suite, priority, etc.).
+
+GitLab MR creation → test cases land in version control, reviewable & auditable.
+
+Simple UI → prevents double-submits, validates required fields, and links to the MR.
+
+Dark mode toggle → for convenience during long QA sessions.
+
+Practical value
+
+⏱ Save time — trivial tests (search, filters, CRUD) can be generated in minutes.
+
+🗂 Repository of record — version-controlled, searchable test cases instead of scattered docs.
+
+🔍 Visibility — devs & PMs can see test design directly in GitLab.
+
+💸 Cost-effective — no subscriptions; built on existing infra.
+
+🧩 Flexible — choose between AI (OpenAI API) or stub mode (demo/local).
+
+🖼️ Demo UI
+
+(screenshot here)
+
+👉 The UI is intentionally simple — it’s not meant to be pretty, but to start helping right away.
+You can run it locally or via Docker and see how test cases are generated and sent to GitLab.
+
+⚡ Quickstart (Local Dev)
+Backend
 ```bash
 pip install -r backend/requirements.txt
 uvicorn backend.main:app --reload
-# http://localhost:8000
+# -> http://localhost:8000
 
-### Frontend
+Frontend
 cd frontend
-npm ci
+npm install    # (first time to generate package-lock.json)
 npm run dev
-# http://localhost:5173
+# -> http://localhost:5173
 
-### API
-POST /api/generate
-Body: { "app": "APP1", "area": "Billing > Invoices", "suite": "Regression", "priority": "P2", "notes": "..." }
+API examples
+# Generate stub test case
+curl -X POST "http://localhost:8000/api/generate?mode=stub" \
+  -H "Content-Type: application/json" \
+  -d '{"app":"APP1","area":"Work Orders > Time Logs","suite":"Regression","priority":"P2","notes":"User can add a time log with duration & comment"}'
 
-Mode: ?mode=ai or ?mode=stub (or env LLM_PROVIDER=openai|stub)
-POST /api/create-mr
+# Create MR (stub fallback → writes to /app/out)
+curl -X POST "http://localhost:8000/api/create-mr" \
+  -H "Content-Type: application/json" \
+  -d '{"app":"APP1","area":"Work Orders > Time Logs","markdown":"---\nid: APP1-TC-001\napp: APP1\narea: Work Orders > Time Logs\nsuite: Regression\npriority: P2\n---\n# Example"}'
 
-Requires: GITLAB_BASE_URL, GITLAB_PROJECT_ID, GITLAB_TOKEN
-If not set, endpoint returns a friendly message (demo users can skip this).
+🐳 Quickstart (Docker)
+cp .env.example .env
+docker compose up --build
+# -> backend on http://localhost:8000, frontend on http://localhost:5173
+```
 
-Env Vars
+⚙️ Configuration
 
-LLM_PROVIDER=stub (default) or openai
+Environment variables:
+- LLM_PROVIDER=stub (default) or openai
+- OPENAI_API_KEY=... (required if using OpenAI)
+- OPENAI_MODEL=gpt-4o-mini (default)
+- GITLAB_BASE_URL, GITLAB_PROJECT_ID, GITLAB_TOKEN → for real MR creation
+(without these, MR drafts are written to /app/out/ for demo use)
 
-OPENAI_API_KEY=... (required if openai)
+📌 Roadmap
 
-OPENAI_MODEL=gpt-4o-mini (default)
+ Jira issue draft output
+ Slack notification (stubbed → /app/out/slack.json)
+ Custom templates per team
+ UI polish (batch input, multi-case generation)
 
-Roadmap
+👩‍💻 Contributing
 
-Jira issue draft output
+Yes, contributions are welcome!
+This is public — outside contributors can fork the repo, submit pull requests, or open issues.
+If you’d like to extend prompts, templates, or UI features, PRs are appreciated.
 
-Slack notification
+📊 Repo insights
 
-Custom templates per team
+This repo is structured for visibility:
+CI/CD: GitHub Actions (backend, frontend, Docker) — badge at top.
+Dependency graph / security scanning: enabled via GitHub settings.
+Discussions: can be enabled if you want Q&A/community chat.
+Insights (commits, code frequency): useful for recruiters to see activity.
 
+📄 License
 
-You can also add a **Docker** quickstart section:
-
-```md
+MIT — free to use, fork, and adapt.
