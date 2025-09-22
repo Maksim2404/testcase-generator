@@ -15,7 +15,7 @@ def _find_repo_root(start: pathlib.Path) -> pathlib.Path:
     return start
 
 REPO_ROOT = _find_repo_root(pathlib.Path(__file__).resolve())
-# If unused you can remove CASES_DIR entirely; otherwise keep it simple:
+# If unused you can remove CASES_DIR entirely;
 CASES_DIR = REPO_ROOT / "apps"
 ID_NUM_RE = re.compile(r".*-TC-(\d+)\.md$", re.IGNORECASE)
 
@@ -174,6 +174,18 @@ def lint_markdown(md: str) -> dict:
     return {"ok": len(errors)==0, "errors": errors, "markdown": md_fixed}
 
 # ---------- GitLab helpers ----------
+def _gitlab_configured() -> bool:
+    return bool(GITLAB_BASE and GITLAB_PROJ and GITLAB_TOKEN)
+    
+def _safe_http_get(url: str, *, params=None, headers=None, timeout=20.0):
+    """HTTP GET that returns None on DNS/connect errors instead of raising."""
+    try:
+        with httpx.Client(timeout=timeout) as c:
+            r = c.get(url, params=params, headers=headers)
+            return r
+    except (httpx.ConnectError, httpx.ReadError, httpx.NetworkError):
+        return None
+
 def parse_id_from_markdown(md: str) -> Optional[str]:
     m = FM_RE.search(md or "")
     if not m:
@@ -198,39 +210,47 @@ def set_id_in_markdown(md: str, new_id: str) -> str:
     return rebuilt + re.sub(r'^\s*---.*?---\s*', "", md, flags=re.DOTALL|re.MULTILINE)
 
 def file_exists_in_gitlab(file_path: str, ref: str = "main") -> bool:
-    if not (GITLAB_BASE and GITLAB_PROJ and GITLAB_TOKEN):
+    if not _gitlab_configured():
         return False
     url_path = urllib.parse.quote(file_path, safe="")
     url = f"{GITLAB_BASE}/api/v4/projects/{GITLAB_PROJ}/repository/files/{url_path}"
-    params = {"ref": ref}
-    with httpx.Client(timeout=20.0) as c:
-        r = c.get(url, params=params, headers=HEADERS)
-        if r.status_code == 200:
-            return True
-        if r.status_code == 404:
-            return False
-        r.raise_for_status()
+    r = _safe_http_get(url, params={"ref": ref}, headers=HEADERS)
+    if r is None:
+        # treat as "not found" in demo mode
         return False
+    if r.status_code == 200:
+        return True
+    if r.status_code == 404:
+        return False
+    # For other statuses, be conservative:
+    return False
 
 def area_to_repo_dir(area: str) -> str:
     parts = [p.strip().lower().replace(" ", "-") for p in area.split(">")]
     return "/".join(parts)
 
 def list_case_files_in_gitlab(app: str, area: str) -> list[str]:
-    if not (GITLAB_BASE and GITLAB_PROJ and GITLAB_TOKEN):
+    if not _gitlab_configured():
         return []
-    path = f"apps/{app.lower()}/areas/{area_to_repo_dir(area)}"
+    path = f"apps/{app.lower()}/areas/{area_to_repo_dir(area)}"   # <- changed
     url = f"{GITLAB_BASE}/api/v4/projects/{GITLAB_PROJ}/repository/tree"
-    params = {"path": path, "per_page": 100}
-    with httpx.Client(timeout=20.0) as c:
-        r = c.get(url, params=params, headers=HEADERS)
-        if r.status_code == 404:
-            return []
-        if r.status_code != 200:
-            raise HTTPException(status_code=r.status_code, detail=r.text)
-        return [item["name"] for item in r.json() if item.get("type")=="blob" and item["name"].endswith(".md")]
+    r = _safe_http_get(url, params={"path": path, "per_page": 100}, headers=HEADERS)
+    if r is None or r.status_code == 404:
+        return []
+    if r.status_code != 200:
+        return []
+    try:
+        data = r.json()
+    except Exception:
+        return []
+    return [
+        item["name"]
+        for item in data
+        if item.get("type") == "blob" and str(item.get("name", "")).endswith(".md")
+    ]
 
 def next_id_from_gitlab(app: str, area: str) -> str:
+    # If we can’t query GitLab, just start at 1
     files = list_case_files_in_gitlab(app, area)
     max_n = 0
     for name in files:
@@ -241,76 +261,73 @@ def next_id_from_gitlab(app: str, area: str) -> str:
     return f"{app}-TC-{max_n+1:03d}"
 
 def create_branch(branch: str, ref: str="main"):
-    if not (GITLAB_BASE and GITLAB_PROJ and GITLAB_TOKEN):
+    if not _gitlab_configured():
         return
     url = f"{GITLAB_BASE}/api/v4/projects/{GITLAB_PROJ}/repository/branches"
     with httpx.Client(timeout=20.0) as c:
         r = c.post(url, headers=HEADERS, data={"branch": branch, "ref": ref})
-        if r.status_code in (200,201,400):
+        # Ignore 400 (already exists)
+        if r.status_code in (200, 201, 400):
             return
-        raise HTTPException(status_code=r.status_code, detail=r.text)
-
+            
 def commit_file(branch: str, file_path: str, content: str, commit_msg: str):
-    if not (GITLAB_BASE and GITLAB_PROJ and GITLAB_TOKEN):
+    if not _gitlab_configured():
         return
     url = f"{GITLAB_BASE}/api/v4/projects/{GITLAB_PROJ}/repository/commits"
-    payload = {
-        "branch": branch,
-        "commit_message": commit_msg,
-        "actions": [{
-            "action": "create",
-            "file_path": file_path,
-            "content": content,
-            "encoding": "text"
-        }]
-    }
-    with httpx.Client(timeout=30.0) as c:
-        r = c.post(url, headers=HEADERS, json=payload)
-    if r.status_code == 400:
-        # try update if already exists
-        payload["actions"][0]["action"] = "update"
+    def do(action: str):
+        payload = {
+            "branch": branch,
+            "commit_message": commit_msg,
+            "actions": [{"action": action, "file_path": file_path, "content": content, "encoding": "text"}]
+        }
         with httpx.Client(timeout=30.0) as c:
-            r2 = c.post(url, headers=HEADERS, json=payload)
-        if r2.status_code not in (200, 201):
-            raise HTTPException(status_code=r2.status_code, detail=r2.text)
+            return c.post(url, headers=HEADERS, json=payload)
+
+    r = do("create")
+    if r.status_code == 400:
+        try:
+            body = r.json()
+        except Exception:
+            body = {"message": r.text}
+        msg = (body.get("message") or "").lower()
+        if "already exists" in msg:
+            r2 = do("update")
+            return
         return
-    if r.status_code not in (200,201):
-        raise HTTPException(status_code=r.status_code, detail=r.text)
+    return
 
 def open_mr(branch: str, title: str, description: str=""):
-    if not (GITLAB_BASE and GITLAB_PROJ and GITLAB_TOKEN):
-        raise HTTPException(status_code=501, detail="Real GitLab integration not enabled in public repo.")
+    if not _gitlab_configured():
+        return None
     url = f"{GITLAB_BASE}/api/v4/projects/{GITLAB_PROJ}/merge_requests"
     data = {"source_branch": branch, "target_branch": "main", "title": title, "description": description}
     with httpx.Client(timeout=20.0) as c:
         r = c.post(url, headers=HEADERS, data=data)
         if r.status_code not in (200,201):
-            raise HTTPException(status_code=r.status_code, detail=r.text)
-        return r.json()["web_url"]
+            return None
+        return r.json().get("web_url")
 
 def find_open_mr_for_branch(source_branch: str) -> Optional[str]:
-    if not (GITLAB_BASE and GITLAB_PROJ and GITLAB_TOKEN):
+    if not _gitlab_configured():
         return None
     url = f"{GITLAB_BASE}/api/v4/projects/{GITLAB_PROJ}/merge_requests"
-    params = {"state": "opened", "source_branch": source_branch, "target_branch": "main"}
-    with httpx.Client(timeout=20.0) as c:
-        r = c.get(url, params=params, headers=HEADERS)
-        r.raise_for_status()
-        data = r.json()
-        if data:
-            return data[0].get("web_url")
+    r = _safe_http_get(url, params={"state":"opened","source_branch":source_branch,"target_branch":"main"}, headers=HEADERS)
+    if r is None or r.status_code != 200:
         return None
+    try:
+        data = r.json()
+    except Exception:
+        return None
+    if data:
+        return data[0].get("web_url")
+    return None
 
 def branch_exists(branch: str) -> bool:
-    if not (GITLAB_BASE and GITLAB_PROJ and GITLAB_TOKEN):
+    if not _gitlab_configured():
         return False
     url = f"{GITLAB_BASE}/api/v4/projects/{GITLAB_PROJ}/repository/branches/{branch}"
-    with httpx.Client(timeout=20.0) as c:
-        r = c.get(url, headers=HEADERS)
-        if r.status_code == 200: return True
-        if r.status_code == 404: return False
-        r.raise_for_status()
-        return False
+    r = _safe_http_get(url, headers=HEADERS)
+    return bool(r and r.status_code == 200)
 
 def unique_branch(base: str) -> str:
     if find_open_mr_for_branch(base) or branch_exists(base):
@@ -369,7 +386,11 @@ def health():
 
 @api.get("/suggest-id")
 def suggest_id(app: str = Query(...), area: str = Query(...)):
-    return {"next_id": next_id_from_gitlab(app, area)}
+    try:
+        return {"next_id": next_id_from_gitlab(app, area)}
+    except Exception:
+        # absolute fallback
+        return {"next_id": f"{app}-TC-001"}
 
 @api.post("/lint")
 def lint(req: LintReq):
@@ -396,21 +417,27 @@ def generate(req: GenerateReq, request: Request):
 
 @api.post("/create-mr", response_model=CreateMrResp)
 def create_mr(req: CreateMrReq):
-    # Fallback to /app/out if GitLab not configured
-    if not (GITLAB_BASE and GITLAB_PROJ and GITLAB_TOKEN):
-        out_dir = Path("/app/out")
-        out_dir.mkdir(parents=True, exist_ok=True)
+    # Demo mode (no GitLab): write files to /app/out and return a pseudo link
+    if not _gitlab_configured():
+        out = pathlib.Path("/app/out")
+        out.mkdir(parents=True, exist_ok=True)
 
-        md_id = parse_id_from_markdown(req.markdown or "") or "TC-UNSET"
-        area_dir = area_to_repo_dir(req.area)
-        # Save three demo files
-        (out_dir / "mr_title.txt").write_text(f"[TC] {md_id} - {req.app} / {req.area}", encoding="utf-8")
-        (out_dir / "mr_branch.txt").write_text(f"feat/{req.app.lower()}-{area_dir.replace('/', '-')}-{md_id}".lower(), encoding="utf-8")
-        (out_dir / "mr_body.md").write_text(req.markdown, encoding="utf-8")
+        intended_id = parse_id_from_markdown(req.markdown or "") or (req.preferred_id or f"{req.app}-TC-001")
+        safe_area = area_to_repo_dir(req.area).replace("/", "-")
+        branch = f"local-demo/{req.app.lower()}-{safe_area}-{intended_id}".lower()
 
-        return {"branch": "demo/stub", "mr_url": "file:///app/out/mr_body.md"}
+        # write markdown
+        rel = out / f"{intended_id}.md"
+        rel.write_text(req.markdown or "", encoding="utf-8")
 
-    # Real GitLab flow (unchanged)
+        # write a tiny “MR body” so UI can link somewhere
+        mr_url = f"file:///app/out/{intended_id}.md"
+        (out / "mr_body.md").write_text(
+            f"# Local demo MR\n\n- Branch: `{branch}`\n- File: `{rel}`\n", encoding="utf-8"
+        )
+        return {"branch": branch, "mr_url": mr_url}
+
+    # Real GitLab flow
     try:
         md_id = parse_id_from_markdown(req.markdown or "")
         intended_id = (md_id or (req.preferred_id or "").strip()) or next_id_from_gitlab(req.app, req.area)
