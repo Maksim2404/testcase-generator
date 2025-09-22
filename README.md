@@ -6,19 +6,13 @@ Built to help teams bootstrap quality processes quickly, without wasting hours w
 🚀 What this app does (and why it matters)
 Core features
 
-AI/stub generation → structured Markdown test cases (front-matter + sections).
-
-Auto-ID allocation (APP-TC-###) → prevents duplicates, keeps naming consistent.
-
-Linting → enforces required YAML keys (owner, suite, priority, etc.).
-
-GitLab MR creation → test cases land in version control, reviewable & auditable.
-
-Simple UI → prevents double-submits, validates required fields, and links to the MR.
-
-Dark mode toggle → for convenience during long QA sessions.
-
-Practical value
+- AI/stub generation → structured Markdown test cases (front-matter + sections).
+- Auto-ID allocation (APP-TC-###) → prevents duplicates, keeps naming consistent.
+- Linting → enforces required YAML keys (owner, suite, priority, etc.).
+- GitLab MR creation → test cases land in version control, reviewable & auditable.
+- Simple UI → prevents double-submits, validates required fields, and links to the MR.
+- Dark mode toggle → for convenience during long QA sessions.
+- Practical value
 
 ⏱ Save time — trivial tests (search, filters, CRUD) can be generated in minutes.
 
