@@ -65,6 +65,7 @@ curl -X POST "http://localhost:8000/api/create-mr" \
 cp .env.example .env
 docker compose up --build
 # -> backend on http://localhost:8000, frontend on http://localhost:5173
+```
 
 ⚙️ Configuration
 
