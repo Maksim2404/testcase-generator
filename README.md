@@ -32,7 +32,7 @@ Practical value
 
 🖼️ Demo UI
 
-(screenshot here)
+![App screenshot](downloads/screenshot.png)
 
 👉 The UI is intentionally simple — it’s not meant to be pretty, but to start helping right away.
 You can run it locally or via Docker and see how test cases are generated and sent to GitLab.
