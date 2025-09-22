@@ -1,5 +1,7 @@
 ﻿services:
   app:
+    volumes:
+      - ./out:/app/out
     build:
       context: .
       dockerfile: ./backend/Dockerfile
