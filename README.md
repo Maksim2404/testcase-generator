@@ -12,17 +12,14 @@ Core features
 - GitLab MR creation → test cases land in version control, reviewable & auditable.
 - Simple UI → prevents double-submits, validates required fields, and links to the MR.
 - Dark mode toggle → for convenience during long QA sessions.
-- Practical value
 
-⏱ Save time — trivial tests (search, filters, CRUD) can be generated in minutes.
+Practical value
 
-🗂 Repository of record — version-controlled, searchable test cases instead of scattered docs.
-
-🔍 Visibility — devs & PMs can see test design directly in GitLab.
-
-💸 Cost-effective — no subscriptions; built on existing infra.
-
-🧩 Flexible — choose between AI (OpenAI API) or stub mode (demo/local).
+- ⏱ Save time — trivial tests (search, filters, CRUD) can be generated in minutes.
+- 🗂 Repository of record — version-controlled, searchable test cases instead of scattered docs.
+- 🔍 Visibility — devs & PMs can see test design directly in GitLab.
+- 💸 Cost-effective — no subscriptions; built on existing infra.
+- 🧩 Flexible — choose between AI (OpenAI API) or stub mode (demo/local).
 
 🖼️ Demo UI
 
