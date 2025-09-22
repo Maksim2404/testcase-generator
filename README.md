@@ -33,7 +33,7 @@ Backend
 ```bash
 pip install -r backend/requirements.txt
 uvicorn backend.main:app --reload
-# -> http://localhost:8000
+# -> http://localhost:8080
 
 Frontend
 cd frontend
@@ -43,19 +43,19 @@ npm run dev
 
 API examples
 # Generate stub test case
-curl -X POST "http://localhost:8000/api/generate?mode=stub" \
+curl -X POST "http://localhost:8080/api/generate?mode=stub" \
   -H "Content-Type: application/json" \
   -d '{"app":"APP1","area":"Work Orders > Time Logs","suite":"Regression","priority":"P2","notes":"User can add a time log with duration & comment"}'
 
 # Create MR (stub fallback → writes to /app/out)
-curl -X POST "http://localhost:8000/api/create-mr" \
+curl -X POST "http://localhost:8080/api/create-mr" \
   -H "Content-Type: application/json" \
   -d '{"app":"APP1","area":"Work Orders > Time Logs","markdown":"---\nid: APP1-TC-001\napp: APP1\narea: Work Orders > Time Logs\nsuite: Regression\npriority: P2\n---\n# Example"}'
 
 🐳 Quickstart (Docker)
 cp .env.example .env
 docker compose up --build
-# -> backend on http://localhost:8000, frontend on http://localhost:5173
+# -> backend on http://localhost:8080, frontend on http://localhost:5173
 ```
 
 ⚙️ Configuration
